@@ -1,3 +1,4 @@
+//! Simplify and smooth linestrings in N dimensions.
 pub use nalgebra;
 use nalgebra::{distance, Point};
 
