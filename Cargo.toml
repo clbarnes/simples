@@ -2,6 +2,9 @@
 name = "simples"
 version = "0.1.1"
 edition = "2021"
+authors = ["Chris L Barnes <chrislloydbarnes@gmail.com>"]
+documentation = "https://docs.rs/simples"
+repository = "https://github.com/clbarnes/simples"
 license-file = "LICENSE"
 description = "N-dimensional linestring smoothing and simplification"
 
