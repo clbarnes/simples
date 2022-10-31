@@ -19,4 +19,5 @@ Currently supports:
 ## To do
 
 - Mapping old points on to resampled points
-- Traits for smoothable/ resampleable?
+- Use a trait instead of nalgebra points
+- tests
