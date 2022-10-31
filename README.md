@@ -1,6 +1,6 @@
 # simples
 
-A rust library for smoothing and simplification of N-dimensional linestrings (as `&[nalgebra::Point]`s).
+A rust library for smoothing and simplification of N-dimensional linestrings (as `&[nalgebra::Point]`s) to 64-bit precision.
 
 Intended for cases where the endpoints of the linestrings cannot be moved
 (for example, if they touch other objects at those locations).

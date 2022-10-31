@@ -1,4 +1,7 @@
-use crate::simplify::Precision;
+//! Smooth linestrings.
+//!
+//! Linestrings are smoothed if they keep the same number of points, but move them around.
+use crate::Precision;
 use nalgebra::{distance_squared, Point};
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
@@ -22,6 +25,10 @@ fn weighted_mean<const D: usize>(
     point / weight
 }
 
+/// Smooth line using a moving average with `2*width + 1` points centred on the point of interest.
+/// At the ends, use a smaller window.
+///
+/// Should probably only be used on a line already resampled with same-length gaps.
 pub fn smooth_moving_average<const D: usize>(
     line: &[Point<Precision, D>],
     width: usize,
@@ -46,16 +53,46 @@ pub fn smooth_moving_average<const D: usize>(
     out
 }
 
+/// Structs which can be use as a smoothing kernel.
 pub trait Kernel {
+    /// If a point is `dist` away from the point of interest, how much should we care about its position?
+    ///
+    /// None if too low to care about or otherwise invalid.
+    /// Weights do not need to sum up to 1.
     fn weigh_dist(&self, dist: Precision) -> Option<Precision>;
 
+    /// If the squared distance from the point of interest to another point is `dist2`, how much should we care about its position?
+    ///
+    /// None if too low to care about or otherwise invalid.
+    /// Weights do not need to sum up to 1.
     fn weigh_dist2(&self, dist2: Precision) -> Option<Precision> {
         self.weigh_dist(dist2.sqrt())
     }
 
+    /// The weight of the point of interest.
     fn at_center(&self) -> Precision;
 }
 
+/// Weight points by how far they are from the point of interest in a linear fashion.
+#[derive(Copy, Clone, Debug)]
+pub struct Linear {
+    max_dist: Precision,
+}
+
+impl Kernel for Linear {
+    fn weigh_dist(&self, dist: Precision) -> Option<Precision> {
+        if dist > self.max_dist {
+            return None;
+        }
+        Some(self.max_dist - dist)
+    }
+
+    fn at_center(&self) -> Precision {
+        self.max_dist
+    }
+}
+
+/// Kernel for Gaussian smoothing.
 #[derive(Copy, Clone, Debug)]
 pub struct Gaussian {
     double_variance: Precision,
@@ -164,6 +201,7 @@ fn reflect_point<const D: usize>(
     2.0 * reflect_around - reflect.coords
 }
 
+/// Smooth line by applying an arbitrary kernel.
 pub fn smooth_convolve<K: Kernel, const D: usize>(
     line: &[Point<Precision, D>],
     kernel: K,
