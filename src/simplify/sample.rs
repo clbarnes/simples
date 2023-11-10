@@ -31,9 +31,9 @@ pub fn sample_every<const D: usize>(
     let mut remaining_dist: f64;
     if offset == 0.0 {
         out.push(prev);
-        remaining_dist = offset;
+        remaining_dist = sample_distance;
     } else {
-        remaining_dist = sample_distance
+        remaining_dist = offset
     }
     let mut next = *iter.next().unwrap();
 
@@ -41,31 +41,28 @@ pub fn sample_every<const D: usize>(
         let vec = next - prev;
         let edge_length = vec.magnitude();
 
-        remaining_dist = match remaining_dist.partial_cmp(&edge_length).unwrap() {
+        match remaining_dist.partial_cmp(&edge_length).unwrap() {
             Ordering::Less => {
                 prev += (vec / edge_length) * remaining_dist;
                 out.push(prev);
-                sample_distance
+                remaining_dist = sample_distance;
             },
             Ordering::Equal => {
                 prev = next;
                 out.push(prev);
-                let next_opt = iter.next();
-                if next_opt.is_none() {
-                    break;
-                }
-                next = *next_opt.unwrap();
-                sample_distance
+                let Some(next_ref) = iter.next() else {
+                    remaining_dist = 0.0;
+                    break
+                };
+                next = *next_ref;
+                remaining_dist = sample_distance;
             },
             Ordering::Greater => {
                 prev = next;
-                let next_opt = iter.next();
-                if next_opt.is_none() {
-                    out.push(prev);
-                    break;
-                }
-                next = *next_opt.unwrap();
-                remaining_dist - edge_length
+                remaining_dist -= edge_length;
+
+                let Some(next_ref) = iter.next() else {break};
+                next = *next_ref;
             },
         };
     }
@@ -87,4 +84,38 @@ pub fn resample<const D: usize>(
     }
     let dist = len / ((n_points - 1) as f64);
     sample_every(line, dist, 0.0).0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn half_line() {
+        let ls1: Vec<Point<f64, 1>> = vec![
+            [0.0].into(),
+            [1.0].into(),
+        ];
+        let resampled = resample(ls1.as_slice(), 3);
+        println!("{:?}", resampled);
+        assert_eq!(resampled.len(), 3);
+        assert_eq!(resampled[0], ls1[0]);
+        assert_eq!(resampled[1], [0.5].into());
+        assert_eq!(resampled[2], ls1[1]);
+    }
+
+    #[test]
+    fn resample_line() {
+        let ls1: Vec<Point<f64, 1>> = vec![
+            [0.0].into(),
+            [3.0].into(),
+        ];
+        let (resampled, remainder) = sample_every(ls1.as_slice(), 1.0, 0.5);
+        println!("{:?}", resampled);
+        assert_eq!(resampled.len(), 3);
+        assert_eq!(resampled[0], [0.5].into());
+        assert_eq!(resampled[1], [1.5].into());
+        assert_eq!(resampled[2], [2.5].into());
+        assert_eq!(remainder, 0.5);
+    }
 }
