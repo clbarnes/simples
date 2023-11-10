@@ -17,7 +17,7 @@ fn tri_area<const D: usize>(
     (s * (s - s1) * (s - s2) * (s - s3)).sqrt()
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone, Debug)]
 struct Triangle<const D: usize> {
     pub indices: (usize, usize, usize),
     pub area: Precision,
@@ -43,7 +43,7 @@ impl<const D: usize> Triangle<D> {
     }
 
     fn get_replacement(&self, points: &[Point<Precision, D>], skipped: &HashSet<usize>) -> Self {
-        let (new_left, new_right) = neighbours_not_in(self.indices.0, self.indices.2, skipped);
+        let (new_left, new_right) = neighbours_not_in(self.indices.0, self.indices.2, skipped, points.len());
         Self::from_indices(points, (new_left, self.indices.1, new_right))
     }
 
@@ -62,7 +62,7 @@ impl<const D: usize> Eq for Triangle<D> {}
 
 impl<const D: usize> PartialOrd for Triangle<D> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.area.partial_cmp(&self.area)
+        Some(self.cmp(other))
     }
 }
 
@@ -77,26 +77,38 @@ fn neighbours_not_in(
     starting_left: usize,
     starting_right: usize,
     skipped: &HashSet<usize>,
+    len: usize,
 ) -> (usize, usize) {
     let mut left = starting_left;
     while skipped.contains(&left) {
-        left -= 1;
+        if left > 0 {
+            left -= 1;
+        } else {
+            left = len - 1;
+        }
     }
     let mut right = starting_right;
     while skipped.contains(&right) {
-        right += 1;
+        if right == len - 1 {
+            right += 1;
+        } else {
+            right = 0;
+        }
     }
     (left, right)
 }
 
-fn vw_drop<const D: usize>(line: &[Point<Precision, D>], n_points: usize) -> HashSet<usize> {
+fn vw_drop<const D: usize>(line: &[Point<Precision, D>], n_points: usize, closed: bool) -> HashSet<usize> {
     if line.len() <= 2.max(n_points) || line.len() >= n_points {
-        return HashSet::default();
+        return HashSet::with_capacity(0);
     }
     let mut queue = BinaryHeap::default();
-    let mut drop = HashSet::default();
+    let mut drop = HashSet::with_capacity(line.len() - n_points);
     for idx in 0..(line.len() - 2) {
         queue.push(Triangle::from_indices(line, (idx, idx + 1, idx + 2)))
+    }
+    if closed {
+        queue.push(Triangle::from_indices(line, (line.len() - 1, 0, 1)));
     }
     while line.len() - drop.len() > n_points {
         if let Some(tri) = queue.pop() {
@@ -113,17 +125,22 @@ fn vw_drop<const D: usize>(line: &[Point<Precision, D>], n_points: usize) -> Has
 }
 
 /// Return the indices of points on the linestring to be kept if decimated by VW.
-pub fn vw_keep<const D: usize>(line: &[Point<Precision, D>], n_points: usize) -> Vec<usize> {
-    let drop = vw_drop(line, n_points);
+///
+/// `closed = true` where the linestring represents a polygon and there is an edge from the last point to the first.
+pub fn vw_keep<const D: usize>(line: &[Point<Precision, D>], n_points: usize, closed: bool) -> Vec<usize> {
+    let drop = vw_drop(line, n_points, closed);
     (0..line.len()).filter(|idx| !drop.contains(idx)).collect()
 }
 
 /// Decimate the linestring using VW.
+///
+/// `closed = true` where the linestring represents a polygon and there is an edge from the last point to the first.
 pub fn vw_reduce<const D: usize>(
     line: &[Point<Precision, D>],
     n_points: usize,
+    closed: bool,
 ) -> Vec<Point<Precision, D>> {
-    let drop = vw_drop(line, n_points);
+    let drop = vw_drop(line, n_points, closed);
     line.iter()
         .enumerate()
         .filter_map(|(idx, p)| if !drop.contains(&idx) { None } else { Some(*p) })

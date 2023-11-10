@@ -1,6 +1,7 @@
 //! Simplify and smooth linestrings in N dimensions.
 pub use nalgebra;
-use nalgebra::{distance, Point};
+use nalgebra::distance;
+pub use nalgebra::Point;
 
 pub mod simplify;
 pub mod smooth;

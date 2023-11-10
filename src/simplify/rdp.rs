@@ -33,11 +33,11 @@ fn rdp_keep_inner<const D: usize>(
     let last = line.last().unwrap();
     let length_sq = distance_squared(first, last);
 
-    let mut greatest_dist2 = (0, -Precision::INFINITY);
+    let mut greatest_dist2 = (0, Precision::NEG_INFINITY);
     for (idx, point) in line.iter().enumerate().skip(1).take(line.len() - 2) {
         let d2 = proj_dist2(first, last, point, length_sq);
         if d2 > greatest_dist2.1 {
-            greatest_dist2 = (idx, d2)
+            greatest_dist2 = (idx + offset, d2)
         }
     }
 
@@ -66,7 +66,8 @@ fn rdp_keep_inner<const D: usize>(
 /// Return the indices of the points in the line which would be kept if simplified using RDP.
 pub fn rdp_keep<const D: usize>(line: &[Point<Precision, D>], epsilon: Precision) -> Vec<usize> {
     let epsilon_sq = epsilon * epsilon;
-    let mut out = vec![0];
+    let mut out = Vec::with_capacity(line.len());
+    out.push(0);
     out.append(&mut rdp_keep_inner(line, epsilon_sq, 0));
     out.push(line.len() - 1);
     out
