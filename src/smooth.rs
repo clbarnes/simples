@@ -26,7 +26,7 @@ fn weighted_mean<const D: usize>(
 }
 
 /// Smooth line using a moving average with `2*width + 1` points centred on the point of interest.
-/// At the ends, use a smaller window.
+/// At the ends, uses a smaller window.
 ///
 /// Should probably only be used on a line already resampled with same-length gaps.
 pub fn smooth_moving_average<const D: usize>(

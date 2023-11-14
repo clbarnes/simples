@@ -5,7 +5,7 @@ use std::cmp::{Ordering, PartialOrd};
 
 /// Create a new linestring by traversing the original, placing a node every `sample_distance`.
 /// `offset` allows you to start partway down the first edge: use 0.0 if you want to include the first node.
-/// Returns the resampled points and the distance from the last resampled point to the original last point.
+/// Returns the resampled points and the geodesic distance from the last resampled point to the original last point.
 ///
 /// A zero-point line remains zero-point; a single-point line keeps that single point.
 /// A line shorter than `sample_distance + offset` will be reduced to a single point.
@@ -46,24 +46,24 @@ pub fn sample_every<const D: usize>(
                 prev += (vec / edge_length) * remaining_dist;
                 out.push(prev);
                 remaining_dist = sample_distance;
-            },
+            }
             Ordering::Equal => {
                 prev = next;
                 out.push(prev);
                 let Some(next_ref) = iter.next() else {
                     remaining_dist = 0.0;
-                    break
+                    break;
                 };
                 next = *next_ref;
                 remaining_dist = sample_distance;
-            },
+            }
             Ordering::Greater => {
                 prev = next;
                 remaining_dist -= edge_length;
 
-                let Some(next_ref) = iter.next() else {break};
+                let Some(next_ref) = iter.next() else { break };
                 next = *next_ref;
-            },
+            }
         };
     }
 
@@ -92,10 +92,7 @@ mod tests {
 
     #[test]
     fn half_line() {
-        let ls1: Vec<Point<f64, 1>> = vec![
-            [0.0].into(),
-            [1.0].into(),
-        ];
+        let ls1: Vec<Point<f64, 1>> = vec![[0.0].into(), [1.0].into()];
         let resampled = resample(ls1.as_slice(), 3);
         println!("{:?}", resampled);
         assert_eq!(resampled.len(), 3);
@@ -106,10 +103,7 @@ mod tests {
 
     #[test]
     fn resample_line() {
-        let ls1: Vec<Point<f64, 1>> = vec![
-            [0.0].into(),
-            [3.0].into(),
-        ];
+        let ls1: Vec<Point<f64, 1>> = vec![[0.0].into(), [3.0].into()];
         let (resampled, remainder) = sample_every(ls1.as_slice(), 1.0, 0.5);
         println!("{:?}", resampled);
         assert_eq!(resampled.len(), 3);
