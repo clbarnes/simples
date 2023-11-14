@@ -43,7 +43,8 @@ impl<const D: usize> Triangle<D> {
     }
 
     fn get_replacement(&self, points: &[Point<Precision, D>], skipped: &HashSet<usize>) -> Self {
-        let (new_left, new_right) = neighbours_not_in(self.indices.0, self.indices.2, skipped, points.len());
+        let (new_left, new_right) =
+            neighbours_not_in(self.indices.0, self.indices.2, skipped, points.len());
         Self::from_indices(points, (new_left, self.indices.1, new_right))
     }
 
@@ -98,7 +99,11 @@ fn neighbours_not_in(
     (left, right)
 }
 
-fn vw_drop<const D: usize>(line: &[Point<Precision, D>], n_points: usize, closed: bool) -> HashSet<usize> {
+fn vw_drop<const D: usize>(
+    line: &[Point<Precision, D>],
+    n_points: usize,
+    closed: bool,
+) -> HashSet<usize> {
     if line.len() <= 2.max(n_points) || line.len() >= n_points {
         return HashSet::with_capacity(0);
     }
@@ -108,7 +113,9 @@ fn vw_drop<const D: usize>(line: &[Point<Precision, D>], n_points: usize, closed
         queue.push(Triangle::from_indices(line, (idx, idx + 1, idx + 2)))
     }
     if closed {
-        queue.push(Triangle::from_indices(line, (line.len() - 1, 0, 1)));
+        let len = line.len();
+        queue.push(Triangle::from_indices(line, (len - 2, len - 1, 0)));
+        queue.push(Triangle::from_indices(line, (len - 1, 0, 1)));
     }
     while line.len() - drop.len() > n_points {
         if let Some(tri) = queue.pop() {
@@ -127,7 +134,11 @@ fn vw_drop<const D: usize>(line: &[Point<Precision, D>], n_points: usize, closed
 /// Return the indices of points on the linestring to be kept if decimated by VW.
 ///
 /// `closed = true` where the linestring represents a polygon and there is an edge from the last point to the first.
-pub fn vw_keep<const D: usize>(line: &[Point<Precision, D>], n_points: usize, closed: bool) -> Vec<usize> {
+pub fn vw_keep<const D: usize>(
+    line: &[Point<Precision, D>],
+    n_points: usize,
+    closed: bool,
+) -> Vec<usize> {
     let drop = vw_drop(line, n_points, closed);
     (0..line.len()).filter(|idx| !drop.contains(idx)).collect()
 }
