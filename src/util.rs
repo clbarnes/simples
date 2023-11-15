@@ -44,7 +44,8 @@ impl<'a, const D: usize> DistanceFinder<'a, D> {
 
     /// Ascending order.
     ///
-    /// For closed linestrings, the closing pair is (last_idx, 0)
+    /// For closed linestrings, the closing pair is (last_idx, 0).
+    /// Panics if indices do not exist.
     fn length_pair(&mut self, start: usize, end: usize) -> Precision {
         if let Some(c) = self.cache.as_mut() {
             let key = (start, end);
@@ -56,7 +57,7 @@ impl<'a, const D: usize> DistanceFinder<'a, D> {
     }
 
     /// Length in ascending order, i.e. `start` must be lower than `end` on a non-closed linestring.
-    /// [None] if indices are not present or `end < start` and the linestring is not closed.
+    /// [None] if indices are not present, or `end < start` with a non-closed linestring.
     pub fn length(&mut self, start: usize, end: usize) -> Option<Precision> {
         use std::cmp::Ordering::*;
         if start >= self.points.len() || end >= self.points.len() {
