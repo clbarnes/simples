@@ -4,6 +4,7 @@ use nalgebra::{distance, Point};
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::collections::{BinaryHeap, HashSet};
 
+/// Area of a triangle based on the locations of its 3 corners.
 fn tri_area<const D: usize>(
     p1: &Point<Precision, D>,
     p2: &Point<Precision, D>,
@@ -17,6 +18,7 @@ fn tri_area<const D: usize>(
     (s * (s - s1) * (s - s2) * (s - s3)).sqrt()
 }
 
+/// A triangle whose corners are indices into some reference table of points.
 #[derive(Copy, Clone, Debug)]
 struct Triangle<const D: usize> {
     pub indices: (usize, usize, usize),
@@ -35,6 +37,7 @@ impl<const D: usize> Triangle<D> {
         }
     }
 
+    /// Check whether the triangle is invalid, i.e. its corner indices appear in the given disallowed set.
     fn is_valid(&self, skipped: &HashSet<usize>) -> bool {
         let is_invalid = skipped.contains(&self.indices.0)
             || skipped.contains(&self.indices.1)
@@ -42,10 +45,26 @@ impl<const D: usize> Triangle<D> {
         !is_invalid
     }
 
-    fn get_replacement(&self, points: &[Point<Precision, D>], skipped: &HashSet<usize>) -> Self {
-        let (new_left, new_right) =
-            neighbours_not_in(self.indices.0, self.indices.2, skipped, points.len());
-        Self::from_indices(points, (new_left, self.indices.1, new_right))
+    /// Find a triangle with the same midpoint and end points which do not appear in the `skipped` set.
+    ///
+    /// The left index goes leftwards, the right index goes rightwards.
+    fn get_replacement(
+        &self,
+        points: &[Point<Precision, D>],
+        skipped: &HashSet<usize>,
+        wrapping: bool,
+    ) -> Option<Self> {
+        let (new_left, new_right) = neighbours_not_in(
+            self.indices.0,
+            self.indices.2,
+            skipped,
+            points.len(),
+            wrapping,
+        )?;
+        Some(Self::from_indices(
+            points,
+            (new_left, self.indices.1, new_right),
+        ))
     }
 
     fn center_index(&self) -> usize {
@@ -63,40 +82,47 @@ impl<const D: usize> Eq for Triangle<D> {}
 
 impl<const D: usize> PartialOrd for Triangle<D> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+        // reversed operands for min-heap
+        other.area.partial_cmp(&self.area)
     }
 }
 
 impl<const D: usize> Ord for Triangle<D> {
     fn cmp(&self, other: &Self) -> Ordering {
-        // operands reversed so it's a min-heap
-        other.partial_cmp(other).unwrap_or(Ordering::Equal)
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)
     }
 }
 
+/// Scan left and right from `left` and `right` for non-`skipped` indices.
 fn neighbours_not_in(
-    starting_left: usize,
-    starting_right: usize,
+    mut left: usize,
+    mut right: usize,
     skipped: &HashSet<usize>,
     len: usize,
-) -> (usize, usize) {
-    let mut left = starting_left;
+    wrapping: bool,
+) -> Option<(usize, usize)> {
+    if skipped.len() >= len - 3 {
+        return None;
+    }
     while skipped.contains(&left) {
         if left > 0 {
             left -= 1;
-        } else {
+        } else if wrapping {
             left = len - 1;
+        } else {
+            return None;
         }
     }
-    let mut right = starting_right;
     while skipped.contains(&right) {
         if right == len - 1 {
             right += 1;
-        } else {
+        } else if wrapping {
             right = 0;
+        } else {
+            return None;
         }
     }
-    (left, right)
+    Some((left, right))
 }
 
 fn vw_drop<const D: usize>(
@@ -104,7 +130,7 @@ fn vw_drop<const D: usize>(
     n_points: usize,
     closed: bool,
 ) -> HashSet<usize> {
-    if line.len() <= 2.max(n_points) || line.len() >= n_points {
+    if line.len() <= 2.min(n_points) {
         return HashSet::with_capacity(0);
     }
     let mut queue = BinaryHeap::default();
@@ -122,7 +148,11 @@ fn vw_drop<const D: usize>(
             if tri.is_valid(&drop) {
                 drop.insert(tri.center_index());
             } else {
-                queue.push(tri.get_replacement(line, &drop));
+                if let Some(repl) = tri.get_replacement(line, &drop, closed) {
+                    queue.push(repl);
+                } else {
+                    break;
+                }
             }
         } else {
             break;
@@ -154,6 +184,92 @@ pub fn vw_reduce<const D: usize>(
     let drop = vw_drop(line, n_points, closed);
     line.iter()
         .enumerate()
-        .filter_map(|(idx, p)| if !drop.contains(&idx) { None } else { Some(*p) })
+        .filter_map(|(idx, p)| if drop.contains(&idx) { None } else { Some(*p) })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use nalgebra::Point2;
+
+    type Pt = Point2<f64>;
+
+    use super::*;
+
+    fn make_line(arrs: Vec<[f64; 2]>) -> Vec<Pt> {
+        arrs.into_iter().map(|p| p.into()).collect()
+    }
+
+    fn assert_reduce(
+        orig: Vec<[f64; 2]>,
+        expected: Vec<[f64; 2]>,
+        n_points: Option<usize>,
+        closed: bool,
+    ) {
+        let orig_line = make_line(orig);
+        let exp_line = make_line(expected);
+
+        let out = vw_reduce(
+            orig_line.as_slice(),
+            n_points.unwrap_or(exp_line.len()),
+            closed,
+        );
+        assert_eq!(out, exp_line);
+    }
+
+    #[test]
+    fn reduce() {
+        assert_reduce(
+            vec![[0.0, 0.0], [0.9, 0.0], [1.0, 1.0], [1.1, 0.0], [2.0, 0.0]],
+            vec![[0.0, 0.0], [0.9, 0.0], [1.1, 0.0], [2.0, 0.0]],
+            None,
+            false,
+        );
+    }
+
+    #[test]
+    fn reduce_multi() {
+        assert_reduce(
+            vec![
+                [0.0, 0.0],
+                [0.9, 0.0],
+                [1.0, 1.0],
+                [1.1, 0.0],
+                [1.9, 0.0],
+                [2.0, 1.0],
+                [2.1, 0.0],
+                [3.0, 0.0],
+            ],
+            vec![
+                [0.0, 0.0],
+                [0.9, 0.0],
+                [1.1, 0.0],
+                [1.9, 0.0],
+                [2.1, 0.0],
+                [3.0, 0.0],
+            ],
+            None,
+            false,
+        )
+    }
+
+    #[test]
+    fn reduce_wrap() {
+        assert_reduce(
+            vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [-0.1, 0.5]],
+            vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            None,
+            true,
+        );
+    }
+
+    #[test]
+    fn reduce_nowrap() {
+        assert_reduce(
+            vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [-0.1, 0.5]],
+            vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [-0.1, 0.5]],
+            None,
+            false,
+        );
+    }
 }
