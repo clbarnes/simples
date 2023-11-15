@@ -19,6 +19,16 @@ pub fn total_length<const D: usize>(line: &[Point<Precision, D>]) -> Precision {
 }
 
 #[cfg(test)]
+mod test_utils {
+    use nalgebra::Point2;
+    pub type Pt = Point2<f64>;
+
+    pub fn make_line(arrs: Vec<[f64; 2]>) -> Vec<Pt> {
+        arrs.into_iter().map(|p| p.into()).collect()
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use nalgebra::{Point1, Point2, Point3};

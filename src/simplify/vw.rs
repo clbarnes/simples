@@ -82,14 +82,17 @@ impl<const D: usize> Eq for Triangle<D> {}
 
 impl<const D: usize> PartialOrd for Triangle<D> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        // reversed operands for min-heap
-        other.area.partial_cmp(&self.area)
+        Some(self.cmp(other))
     }
 }
 
 impl<const D: usize> Ord for Triangle<D> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+        // reversed operands for min-heap
+        other
+            .area
+            .partial_cmp(&self.area)
+            .unwrap_or(Ordering::Equal)
     }
 }
 
@@ -147,12 +150,10 @@ fn vw_drop<const D: usize>(
         if let Some(tri) = queue.pop() {
             if tri.is_valid(&drop) {
                 drop.insert(tri.center_index());
+            } else if let Some(repl) = tri.get_replacement(line, &drop, closed) {
+                queue.push(repl);
             } else {
-                if let Some(repl) = tri.get_replacement(line, &drop, closed) {
-                    queue.push(repl);
-                } else {
-                    break;
-                }
+                break;
             }
         } else {
             break;
@@ -190,15 +191,8 @@ pub fn vw_reduce<const D: usize>(
 
 #[cfg(test)]
 mod tests {
-    use nalgebra::Point2;
-
-    type Pt = Point2<f64>;
-
     use super::*;
-
-    fn make_line(arrs: Vec<[f64; 2]>) -> Vec<Pt> {
-        arrs.into_iter().map(|p| p.into()).collect()
-    }
+    use crate::test_utils::make_line;
 
     fn assert_reduce(
         orig: Vec<[f64; 2]>,

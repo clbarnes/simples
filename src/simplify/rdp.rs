@@ -81,3 +81,36 @@ pub fn rdp_reduce<const D: usize>(
     let kept = rdp_keep(line, epsilon);
     kept.into_iter().map(|idx| line[idx]).collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::test_utils::make_line;
+
+    fn assert_reduce(orig: Vec<[f64; 2]>, expected: Vec<[f64; 2]>, epsilon: f64) {
+        let orig_line = make_line(orig);
+        let exp_line = make_line(expected);
+
+        let out = rdp_reduce(orig_line.as_slice(), epsilon);
+        assert_eq!(out, exp_line);
+    }
+
+    #[test]
+    fn reduce() {
+        assert_reduce(
+            vec![[0.0, 0.0], [1.0, 0.1], [2.0, 0.0]],
+            vec![[0.0, 0.0], [2.0, 0.0]],
+            0.2,
+        );
+    }
+
+    #[test]
+    fn reduce_multi() {
+        assert_reduce(
+            vec![[0.0, 0.0], [0.5, 0.6], [1.0, 1.0], [1.6, 0.5], [2.0, 0.0]],
+            vec![[0.0, 0.0], [1.0, 1.0], [2.0, 0.0]],
+            0.2,
+        )
+    }
+}

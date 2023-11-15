@@ -11,6 +11,7 @@ description = "N-dimensional linestring smoothing and simplification"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lru = "0.12.0"
 nalgebra = "0.31"
 
 [dev-dependencies]
