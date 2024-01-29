@@ -79,6 +79,12 @@ pub struct Linear {
     max_dist: Precision,
 }
 
+impl Linear {
+    pub fn new(max_dist: Precision) -> Self {
+        Self { max_dist }
+    }
+}
+
 impl Kernel for Linear {
     fn weigh_dist(&self, dist: Precision) -> Option<Precision> {
         if dist > self.max_dist {
