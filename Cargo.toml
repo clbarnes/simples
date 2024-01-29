@@ -13,6 +13,7 @@ description = "N-dimensional linestring smoothing and simplification"
 [dependencies]
 lru = "0.12.0"
 nalgebra = "0.31"
+num-traits = "0.2.17"
 
 [dev-dependencies]
 cargo-release = "0.22"

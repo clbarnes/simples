@@ -1,7 +1,10 @@
 //! Resample a linestring by placing evenly-spaced points along its length.
-use crate::{total_length, Precision};
+use crate::{dist, total_length, zip_op, Precision};
 use nalgebra::Point;
+use num_traits::Float;
 use std::cmp::{Ordering, PartialOrd};
+
+use crate::{sum, Coord, Location};
 
 /// Create a new linestring by traversing the original, placing a node every `sample_distance`.
 /// `offset` allows you to start partway down the first edge: use 0.0 if you want to include the first node.
@@ -11,25 +14,25 @@ use std::cmp::{Ordering, PartialOrd};
 /// A line shorter than `sample_distance + offset` will be reduced to a single point.
 ///
 /// `sample_distance` must be positive and `offset` must be non-negative (panics if these are invalid).
-pub fn sample_every<const D: usize>(
-    line: &[Point<Precision, D>],
-    sample_distance: Precision,
-    offset: Precision,
-) -> (Vec<Point<Precision, D>>, Precision) {
-    if sample_distance <= 0.0 {
+pub fn sample_every<T: Float, const D: usize>(
+    line: &[Coord<T, D>],
+    sample_distance: T,
+    offset: T,
+) -> (Vec<Coord<T, D>>, T) {
+    if sample_distance.is_sign_negative() || sample_distance.is_zero() {
         panic!("`sample_distance` must be positive");
     }
-    if offset < 0.0 {
+    if offset.is_sign_negative() {
         panic!("`offset` must be non-negative");
     }
     let mut iter = line.iter();
     if line.len() <= 1 {
-        return (iter.cloned().collect(), 0.0);
+        return (iter.cloned().collect(), T::zero());
     }
     let mut prev = *iter.next().unwrap();
     let mut out = Vec::default();
-    let mut remaining_dist: f64;
-    if offset == 0.0 {
+    let mut remaining_dist: T;
+    if offset.is_zero() {
         out.push(prev);
         remaining_dist = sample_distance;
     } else {
@@ -38,8 +41,8 @@ pub fn sample_every<const D: usize>(
     let mut next = *iter.next().unwrap();
 
     loop {
-        let vec = next - prev;
-        let edge_length = vec.magnitude();
+        let vec = zip_op(&next, &prev, |a, b| *a - *b);
+        let edge_length = dist(vec);
 
         match remaining_dist.partial_cmp(&edge_length).unwrap() {
             Ordering::Less => {
@@ -51,7 +54,7 @@ pub fn sample_every<const D: usize>(
                 prev = next;
                 out.push(prev);
                 let Some(next_ref) = iter.next() else {
-                    remaining_dist = 0.0;
+                    remaining_dist = T::zero();
                     break;
                 };
                 next = *next_ref;
